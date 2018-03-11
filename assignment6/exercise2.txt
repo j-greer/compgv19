@@ -1,0 +1,12 @@
+Difference between TrustRegionLS.m and solverCM2dSubspaceExtLS.m
+
+(1) TRUSTREGIONLS Trust region iteration for large scale problems
+
+(2) SOLVERCM2DSUBSPACEEXT Solves quadratic constraint trust region problem with possibly indefinite Hessian via 2d subspace
+
+In (2) the gradient and hessian are computed as handlers.
+(2) Approximates the Hessian if indefinte using iterative solver if the dimension is larger then 10, else get smallest eigen value
+
+(2) Check for three cases in B, negative eigenvalues, zero eigenvalues or postive eigenvalues a,b,c
+
+
