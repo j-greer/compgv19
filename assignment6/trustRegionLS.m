@@ -72,7 +72,7 @@ while ~stopCond && (k < maxIter)
   Mk.dm = @(p) F.df(x_k) + F.d2f(x_k, p);
   Mk.d2m = @(p) F.d2f(x_k, p); 
   
-  p = solverCM(F, x_k, Delta_k); % for SR-1 s_k = p_k
+  p = solverCM(F, x_k, Delta_k, maxIter); % for SR-1 s_k = p_k
   if sr1
     % Compute y_k. Note, that B update happens even if the step is not taken. 
     y_k = F.df(x_k + p) - F.df(x_k);

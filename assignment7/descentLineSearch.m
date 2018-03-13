@@ -73,6 +73,7 @@ while (normError >= tol && nIter <= maxIter)
         end
       case 'gauss' % Gauss-Newton algorithm
       %================================= YOUR CODE HERE =============================
+      % r should be 3xn right now its 1xn
       p_k = (F.J(x_k)'*F.J(x_k)) \ (-F.J(x_k)'*F.r(x_k));
       %==============================================================================
     end

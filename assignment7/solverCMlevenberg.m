@@ -13,7 +13,7 @@ function p = solverCMlevenberg(F, x_k, Delta, maxIter)
 % maxIter: maximum number of iterations
 %
 % OUTPUT
-% p: step (direction times lenght)
+% p: step (direction times length)
 %
 % Based on Algorithm 4.3 in Nocedal Wright
 % Copyright (C) 2017 Marta M. Betcke, Kiko Rul·lan 
