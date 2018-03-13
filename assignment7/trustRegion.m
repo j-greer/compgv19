@@ -1,6 +1,6 @@
-function [x_k, f_k, k, info] = trustRegionLS(F, x0, solverCM, Delta, eta, tol, maxIter, debug, F2)
-% TRUSTREGIONLS Trust region iteration for large scale problems
-% [x_k, f_k, k, info] = trustRegionLS(F, x0, solverCM, Delta, eta, tol, maxIter, debug)
+function [x_k, f_k, k, info] = trustRegion(F, x0, solverCM, Delta, eta, tol, maxIter, debug, F2)
+% TRUSTREGION Trust region iteration
+% [x_k, f_k, k, info] = trustRegion(F, x0, solverCM, Delta, eta, tol, maxIter, debug, F2)
 % INPUTS
 % F: structure with fields
 %   - f: function handler
@@ -11,12 +11,8 @@ function [x_k, f_k, k, info] = trustRegionLS(F, x0, solverCM, Delta, eta, tol, m
 % solverCM: handle to solver to quadratic constraint trust region problem
 % Delta: upper limit on trust region radius
 % eta: step acceptance relative progress threshold
-% tol: parameter in stopping condition (specified with stopType
-%      parameter inside the function)
-%      on minimal allowed step
-%        norm(x_k - x_k_1)/norm(x_k) < tol
-%      or norm of the gradient 
-%        norm(F.df(x_k), 'inf') < tol*(1 + abs(F.f(x_k)))
+% tol: stopping condition on minimal allowed step
+%      norm(x_k - x_k_1)/norm(x_k) < tol;
 % maxIter: maximum number of iterations
 % debug: debugging parameter switches on visualization of quadratic model
 %        and various step options. Only works for functions in R^2
@@ -60,22 +56,25 @@ info.xind(1) = 1;
 sr1 = ~isfield(F, 'd2f');
 if sr1
   % Initialise with B_0
-  F.d2f = @(x, q) q; % B_0 = Identity matrix. Returns q for I*q
+  F.d2f = @(x) eye(length(x0)); % B_0 = Identity matrix. 
   info.B = [];
 end
 
 while ~stopCond && (k < maxIter)
   k = k+1;
+  disp(k)
  
   % Construct and solve quadratic model
-  Mk.m = @(p) F.f(x_k) + F.df(x_k)'*p + 0.5*p'*F.d2f(x_k, p); % note F.d2f(x_k, p) executes B_k*p
-  Mk.dm = @(p) F.df(x_k) + F.d2f(x_k, p);
-  Mk.d2m = @(p) F.d2f(x_k, p); 
+  Mk.m = @(p) F.f(x_k) + F.df(x_k)'*p + 0.5*p'*F.d2f(x_k)*p;
+  Mk.dm = @(p) F.df(x_k) + F.d2f(x_k)*p;
+  Mk.d2m = @(p) F.d2f(x_k);
   
-  p = solverCM(F, x_k, Delta_k); % for SR-1 s_k = p_k
+  p = solverCM(F, x_k, Delta_k,maxIter); % for SR-1 s_k = p_k
   if sr1
+    %==================== YOUR CODE HERE ================================
     % Compute y_k. Note, that B update happens even if the step is not taken. 
-    y_k = F.df(x_k + p) - F.df(x_k);
+    y_k = F.df(x_k+p) - F.df(x_k); 
+    %====================================================================
   end
   
   if debug
@@ -84,10 +83,9 @@ while ~stopCond && (k < maxIter)
     plotTaylor(F2, x_k, [x_k - 4*Delta_k, x_k + 4*Delta_k], Delta_k, p);
     hold on,
     g = -F.df(x_k);
-    [gu, flag, relres, iter, resvec, gus] = mcg(@(y) F.d2f(x_k, y), g, 1e-6, 1000, @(x) x); % iterative solve to approximate F.d2f(x_k)\g;
+    gu = -F.d2f(x_k)\g;
     plot(x_k(1) + g(1)*Delta_k/norm(g), x_k(2) + g(2)*Delta_k/norm(g), 'rs')
-    %plot(x_k(1) + gu(1)*Delta_k/norm(gu), x_k(2) + gu(2)*Delta_k/norm(gu), 'bo')
-    plot(x_k(1) + gu(1), x_k(2) + gu(2), 'bo')
+    plot(x_k(1) + gu(1)*Delta_k/norm(gu), x_k(2) + gu(2)*Delta_k/norm(gu), 'bo')
     pause
   end
   
@@ -113,6 +111,7 @@ while ~stopCond && (k < maxIter)
   % Accept step if rho_k > eta
   x_k_1 = x_k; % if step is not accepted x_k_1 = x_k
   if rho_k > eta
+  %  x_k_1 = x_k;
     x_k = x_k + p;
     
     % Record all taken steps including iteration index
@@ -138,25 +137,22 @@ while ~stopCond && (k < maxIter)
   end
 
   % SR1 quasi Netwon: Hessian update
-  % Efficient large scale implementation: 
-  % - implement Hessian as their action on a vector 
-  %     F.d2f(x, q) ... evaluates the Hessian (approximation) at 'x'and multiplies it with vector 'q'.
-  % - use iterative solvers 
+  % Note: this implementation constructs Hessian matrices explicitely hence is not suitable for large scale.
+  % Efficient large scale implementation either needs to use iterative solvers to invert the Hessian inside solverCM
+  % or needs to update the Hessian and its inverse at the same time. 
+  % Then they both can be implemented as their action on a vector H_k(x) = H_k*x, B_k(x) = B_k*x as for H_k in BFGS.
   if sr1  
-    % Residual vector of the secant equation. 
-    % B_k_1 * p = F.d2f(x_k_1, p). This is legacy notation as F.d2f(x, p) multiplies p with a matrix and hence F.d2f does not depend on x.  
-    rSec = y_k - F.d2f(x_k_1, p); % recall notation s_k = p_k, 
-    
-    % Update Hessian approximation if condition holds, otherwise skip update.
-    if (abs(rSec'*p) >= r*norm(p)*norm(rSec))
-      % B_k = B_k_1 + (rSec*rSec')/(rSec'*p);
-      F.d2f = @(x, q) F.d2f(x_k_1, q) + (rSec'*q)/(rSec'*p)*rSec; % this update is only valid at x_k, F.d2f = F.d2f(x_k, q) multiplies q with a matrix.
+
+    %==================== YOUR CODE HERE ============================
+    B_k = F.d2f(x_k);
+    if abs((y_k - B_k*p)'*p) >= r*norm(p)*norm(y_k - B_k*p)
+        F.d2f = @(x) F.d2f(x) + ((y_k - B_k*p)*(y_k - B_k*p)')/((y_k - B_k*p)'*p);
     end
+    %================================================================
               
     if extractB
       % Extraction of B_k function handler
-      info.B{length(info.B)+1} = @(q) F.d2f(x_k, q);  % reduce to only q parameter, legacy corresponds to F.d2f(x_k, q) 
-      %info.B{length(info.B)+1} = F.d2f; % the original handle with both parameters.
+      info.B{length(info.B)+1} = F.d2f(x_k); 
     end
   end
 end
