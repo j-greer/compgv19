@@ -34,17 +34,17 @@ x = x0;
 j = 1;
 nIter = 0;
 resV = [];
+info.xs = [];
 while j <= maxIter
 	w = (abs(finitediff(x,[1 0])).^2+abs(finitediff(x,[0 1])).^2);
     w = .5*lambda./sqrt(w + 1e-12*max(w(:)));
 	M = @(x) afun(x)+DTwD(x,w);
     [x,tmp,dmp,~] = conjugateGradient(M,b,1e-3,maxIter,P,x);
-    nIter = [nIter; nIter(end)+tmp(2:end)];
+    nIter = [nIter; nIter(end)+tmp];
     resV = [resV; dmp(2:end)];
+    info.xs = [info.xs;reshape(x,[],1)];
     j = j + 1;
-    disp(j)
 end
 nIter = nIter(2:end);
 xMin = x;
-info = 1;
 end
